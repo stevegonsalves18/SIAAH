@@ -99,20 +99,20 @@ hour, minute = map(int, farmer.preferred_time.split(":"))
 scheduler.add_job(job_daily, 'cron', hour=hour, minute=minute, id='daily_notification')
 
 # API ENDPOINTS
-
 @app.get("/")
 def root():
     return {
         "message": "AgriBuddy Notification Service",
         "version": "2.0",
         "features": ["Scheduled notifications", "On-demand SMS", "Dynamic phone numbers"],
-        "endpoints": {
-            "status": "/start",
-            "scheduled_sms": "/test_sms (POST)", 
-            "scheduled_call": "/test_call (POST)",
-            "dynamic_sms": "/send_sms_to (POST)",
-            "dynamic_call": "/call_number (POST)",
-            "run_daily": "/run_now (POST)"
+        "ai_agent_endpoints": {
+            "send_sms_get": "/send_sms_get?phone=+91XXXXXXXXXX&name=FarmerName",
+            "call_get": "/call_get?phone=+91XXXXXXXXXX&name=FarmerName",
+            "status": "/start"
+        },
+        "post_endpoints": {
+            "send_sms_to": "/send_sms_to (POST)",
+            "call_number": "/call_number (POST)"
         }
     }
 
@@ -156,7 +156,7 @@ async def run_now():
     except Exception as e:
         return {"status": "Job failed", "error": str(e)}
 
-# DYNAMIC ENDPOINTS (for any phone number)
+# DYNAMIC ENDPOINTS (for any phone number) - POST VERSION
 @app.post("/send_sms_to")
 async def send_sms_to(request: Request):
     data = await request.json()
@@ -189,6 +189,33 @@ async def call_number(request: Request):
         "called": phone,
         "name": name,
         "call_content": f"Weather info and price: ₹{price}/qtl"
+    }
+
+# AI AGENT FRIENDLY GET ENDPOINTS (to fix "Method Not Allowed" error)
+@app.get("/send_sms_get")
+async def send_sms_get(phone: str, name: str = "Farmer"):
+    temp, rain, _ = fetch_weather()
+    price, conf = fetch_price()
+    success = send_sms_to_phone(phone, name, temp, rain, price, conf)
+    return {
+        "status": "SMS sent successfully" if success else "SMS failed",
+        "sent_to": phone,
+        "name": name,
+        "message": f"Weather update sent: {temp}°C, Rain: {rain}mm, Price: ₹{price}/qtl",
+        "ai_agent_success": True
+    }
+
+@app.get("/call_get")
+async def call_get(phone: str, name: str = "Farmer"):
+    temp, rain, _ = fetch_weather()
+    price, conf = fetch_price()
+    success = make_call_to_phone(phone, name, temp, rain, price)
+    return {
+        "status": "Call placed successfully" if success else "Call failed",
+        "called": phone,
+        "name": name,
+        "message": f"Voice call placed with weather and price info",
+        "ai_agent_success": True
     }
 
 # UTILITY ENDPOINTS
